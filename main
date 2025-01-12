@@ -1,0 +1,4 @@
+from coinbase.rest import RESTClient
+
+client = RESTClient() # Uses environment variables for API key and secret
+
