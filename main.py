@@ -6,6 +6,7 @@ import http.client
 import json
 import datetime
 import time
+import requests
 
 load_dotenv()
 api_key = os.getenv("COINBASE_API_KEY")
@@ -44,18 +45,18 @@ response = client.get_market_trades(product_id=product_id, limit=50)
 # print(dumps(response.to_dict(), indent=2))
 
 #GET LIST PRODUCTS
-response = client.get_public_products()
-products_data = response.to_dict().get('products', [])
+# response = client.get_public_products()
+# products_data = response.to_dict().get('products', [])
 
-# Filter out pairs that contain "USD" in the product_id
-usd_pairs = [product for product in products_data if "USD" in product['product_id']]
+# # Filter out pairs that contain "USD" in the product_id
+# usd_pairs = [product for product in products_data if "USD" in product['product_id']]
 
-# Save filtered USD pairs to a JSON file
-with open("usd_pairs.json", "w") as output_file:
-    json_data = dumps(usd_pairs, indent=2)
-    output_file.write(json_data)
+# # Save filtered USD pairs to a JSON file
+# with open("usd_pairs.json", "w") as output_file:
+#     json_data = dumps(usd_pairs, indent=2)
+#     output_file.write(json_data)
 
-print(f"Filtered {len(usd_pairs)} pairs containing 'USD' and saved to 'usd_pairs.json'.")
+# print(f"Filtered {len(usd_pairs)} pairs containing 'USD' and saved to 'usd_pairs.json'.")
 
 #GET PRODUCT CANDLES
 
@@ -70,12 +71,15 @@ print(f"Filtered {len(usd_pairs)} pairs containing 'USD' and saved to 'usd_pairs
 #GET BACKTEST DATA=====================================================================================
 
 # Product ID and granularity
-product_ids = ["BTC-USDC", "ETH-USDC", "XRP-USDC", "DOGE-USDC", "ADA-USDC", "XLM-USDC", "LINK-USDC", "HBAR-USDC", "BCH-USDC",
+# "BTC-USDC", "ETH-USDC", "XRP-USDC","DOGE-USDC", "ADA-USDC",
+product_ids = [ "XLM-USDC", "LINK-USDC", "HBAR-USDC", "BCH-USDC",
                "LTC-USDC", "DAI-USDC", "ETC-USDC", "CRO-USDC", "VET-USDC", "FIL-USDC", "FET-USDC", "ALGO-USDC", "ATOM-USDC", "STX-USDC",
                "XTZ-USDC", "QNT-USDC", "MKR-USDC", "EOS-USDC", "MANA-USDC", "MATIC-USDC", "ZEC-USDC", "CHZ-USDC", "GNO-USDC", "SNX-USDC", 
                "KAVA-USDC","KSM-USDC", "DASH-USDC", "ZRX-USDC", "GLM-USDC", "ZEN-USDC", "ANKR-USDC", "BAT-USDC", "IOTX-USDC", "XYO-USDC", 
                "LRC-USDC", "RPL-USDC", "VTHO-USDC", "STORJ-USDC", "BAND-USDC", "COTI-USDC", 
                ]
+
+
 granularity = "FIVE_MINUTE"  # Five-minute candles
 
 # Date range for 4 years
@@ -89,8 +93,10 @@ max_candles = 350
 for product_id in product_ids:
     # List to store all the candles
     all_candles = []
+    end_time = int(datetime.datetime(2025, 1, 1, 0, 0, 0).timestamp()) # Fixed end time (Unix timestamp)
+    start_time = end_time - (4 * 365 * 24 * 60 * 60)  # 4 years ago
 
-    print("Starting data collection for {product_id}...")
+    print("Starting data collection for" + f"{product_id}" + "...")
 
     # Iterate through the time range in chunks
     while start_time < end_time:
@@ -103,7 +109,14 @@ for product_id in product_ids:
         print(f"Fetching data for {product_id} from {datetime.datetime.fromtimestamp(start_time)} to {datetime.datetime.fromtimestamp(chunk_end_time)}")
 
         # Request the data
-        response = client.get_candles(product_id=product_id, start=start_time, end=chunk_end_time, granularity=granularity)
+        # response = client.get_candles(product_id=product_id, start=start_time, end=chunk_end_time, granularity=granularity)
+        try:
+            response = client.get_candles(product_id=product_id, start=start_time, end=chunk_end_time, granularity=granularity)
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 429:
+                print("Rate limit hit. Waiting for 30 seconds...")
+            time.sleep(30)
+            continue
 
         # Convert response to a dictionary and store in the list
         candles = response.to_dict().get('candles', [])
